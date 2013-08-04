@@ -2,16 +2,17 @@ package org.taktik.rsync.checksum.impl;
 
 import org.taktik.rsync.checksum.RollingChecksum;
 
+import java.nio.ByteBuffer;
+
 /**
- * User: abaudoux
- * Date: 03/08/13
- * Time: 15:45
+ * Original rsync implementation of rolling checksum
+ * See http://rsync.samba.org/tech_report/node3.html
  */
 public class RsyncRollingChecksum implements RollingChecksum {
 
     private int value = 0;
-    private long s1=0;
-    private long s2=0;
+    private int s1 = 0;
+    private int s2 = 0;
     private int blockSize = 0;
 
     public int init(byte[] bytes, int off, int len) {
@@ -23,9 +24,24 @@ public class RsyncRollingChecksum implements RollingChecksum {
             s2 += (last - off + 1) * b;
             off++;
         }
-        s2 = s2 & 0xFFFF;
-        s1 = s1 & 0xFFFF;
-        value = (int) ((s2 << 16) | s1);
+        s2 &= 0xFFFF;
+        s1 &= 0xFFFF;
+        value = (s2 << 16) | s1;
+        return value;
+    }
+
+    public int init(ByteBuffer bytes, int off, int len) {
+        blockSize = len;
+        int last = off + blockSize - 1;
+        while (off <= last) {
+            byte b = bytes.get(off);
+            s1 += b;
+            s2 += (last - off + 1) * b;
+            off++;
+        }
+        s2 &= 0xFFFF;
+        s1 &= 0xFFFF;
+        value = (s2 << 16) | s1;
         return value;
     }
 
@@ -47,7 +63,7 @@ public class RsyncRollingChecksum implements RollingChecksum {
     public int roll(byte previous, byte next) {
         s1 = (s1 - previous + next) & 0xFFFF;
         s2 = (s2 - (blockSize * previous) + s1) & 0xFFFF;
-        value = (int) ((s2 << 16) | s1);
+        value = (s2 << 16) | s1;
         return value;
     }
 }
